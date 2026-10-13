@@ -1,0 +1,10 @@
+__pycache__
+.vscode
+cache
+cache_soft
+data
+distill_files_test
+logged_files_test
+origin_code
+soft_files_test
+test_main.ipynb
