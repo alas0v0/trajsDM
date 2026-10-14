@@ -14,11 +14,13 @@ common_args=(
     --loss_type triplet
     --target_measure haus
     --emb_sim_metric euc
+    --temperature 0.7
 )
 
-for temperature in 0.1 0.3 0.5; do
-    echo "Starting training with temperature=${temperature}"
-    python main_train_model.py "${common_args[@]}" --temperature "$temperature"
+for neigh_num in 3 5 7; do
+    echo "Starting training with neigh_num=${neigh_num}"
+    python main_train_model.py "${common_args[@]}" --neighbor_num "$neigh_num"
 done
 
 echo "All training runs completed."
+ 

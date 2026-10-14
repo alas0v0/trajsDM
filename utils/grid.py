@@ -7,7 +7,8 @@ class Grid(object):
 
         self.delta = delta 
         self.lon_range = lon_range
-        self.lat_range = lat_range 
+        self.lat_range = lat_range
+        self.neigh_num = 1 
         self._init_grid_index()
 
     def _init_grid_index(self):
@@ -49,5 +50,14 @@ class Grid(object):
             return x_grid_idx_list, y_grid_idx_list, grid_idx_list
         else:
             raise ValueError(f"list_type只支持sepa和zip")
+
+    def get_neighbor_offsets(self):
+        radius = self.neigh_num // 2
+        return [
+            (dx, dy)
+            for dx in range(-radius, radius + 1)
+            for dy in range(-radius, radius + 1)
+        ] 
+
         
         

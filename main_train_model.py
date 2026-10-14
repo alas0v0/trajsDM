@@ -36,11 +36,12 @@ yaml.dump(dict(vars(args)), open(os.path.join(save_dir, 'config.yaml'), 'w'))  #
 log_ini(save_dir)
 set_seed(args.seed)
 args.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
+grid_mode = args.grid_mode
 
 traj_data = TrajData(args.dataset, args.target_measure, config["datasets"], args.grid_size)
-train_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="train")
-eval_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="eval")
-test_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="test")
+train_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="train",grid_mode=grid_mode)
+eval_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="eval",grid_mode=grid_mode)
+test_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="test",grid_mode=grid_mode)
 
 model = get_model(args, config, traj_data)
 criterion = initialize_loss(args).to(args.device)

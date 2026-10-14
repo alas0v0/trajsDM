@@ -9,7 +9,7 @@ from utils.tools import get_padded_mask, get_normalized_padded_traj
 
 
 class TrajSimLeaDataLoader():
-    def __init__(self, traj_data, args, mode, syn_data = None):
+    def __init__(self, traj_data, args, mode, syn_data = None, grid_mode="soft"):
         # 创建DataSet
         self.mode = mode 
         if self.mode == "train":
@@ -23,6 +23,7 @@ class TrajSimLeaDataLoader():
         else:
             raise ValueError("Not right mode")
         
+        self.grid_mode = grid_mode
         self.mean_lon = traj_data.mean_lon 
         self.mean_lat = traj_data.mean_lat 
         self.std_lon = traj_data.std_lon 
@@ -32,12 +33,13 @@ class TrajSimLeaDataLoader():
         self.lon_range = traj_data.lon_range
         self.lat_range = traj_data.lat_range
         self.grid = traj_data.grid
+        self.grid.neigh_num = args.neighbor_num
 
         self.mean_and_std = (self.mean_lon, self.mean_lat, self.std_lon, self.std_lat)
         self.range = (self.lon_range, self.lat_range)
         #soft_grid
         self.grid.temperature = args.temperature
-        print(f"temperature = {self.grid.temperature}")
+        print(f"temperature = {self.grid.temperature} ,neigh_num = {self.grid.neigh_num}")
         if self.mode == "syn":
             self.trajs, self.dist_matrix = self.data
             traj_lens, self.x_grid_idx_list, self.y_grid_idx_list, self.grid_idx_list, _ = TrajData.getTrajs(self.trajs, self.grid)
@@ -46,7 +48,7 @@ class TrajSimLeaDataLoader():
             self.split_dataset = [self.trajs, self.dist_matrix, self.traj_lens, self.x_grid_idx_list ,self.y_grid_idx_list, self.grid_idx_list]
 
         if args.model == "ConvTraj":
-            self.dataset = ConvTrajDatset(self.split_dataset,self.max_traj_len, self.mean_and_std, self.range, self.grid)
+            self.dataset = ConvTrajDatset(self.split_dataset,self.max_traj_len, self.mean_and_std, self.range, self.grid, self.grid_mode)
 
         elif args.model == "TrajCL":
             self.dataset = TrajCLDataset(self.split_dataset, self.mean_lon, self.mean_lat, self.std_lon, self.std_lat)
@@ -338,7 +340,7 @@ class TrajSimLeaDataLoader():
         temp = max(float(temperature), 1e-12)
 
         neighbor_offsets = torch.tensor(
-            [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)],
+            grid.get_neighbor_offsets(),
             device=device,
             dtype=torch.long,
         )
@@ -355,7 +357,10 @@ class TrajSimLeaDataLoader():
         # weights = torch.softmax(logits, dim=-1)
         weights=1/(1+ (ndist2 / temp)**2)
         weights = torch.where(inside, weights, torch.zeros_like(weights))
-
+        #weights 归一化
+        weight_sum = weights.sum(dim=-1, keepdim=True)
+        weights = weights / weight_sum.clamp_min(1e-12)
+        
         linear_idx = ngy * x_num + ngx
         linear_idx = torch.where(inside, linear_idx, torch.zeros_like(linear_idx), )
         return weights, linear_idx

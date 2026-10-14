@@ -28,6 +28,10 @@ def build_parser():
     parser.add_argument('--grid_size', type=float, default=0.01, help='测试合成数据集效果、MTT训练training track和DC内层训练时的l2 regularization')
     parser.add_argument('--grid_emb_size', type=int, default=32, help="grid编码成向量的长度")
     parser.add_argument('--temperature', type=float, default=0.7 ,help="生成连续image用到的超参数")
+    parser.add_argument('--neighbor_num', type=int, default=3 ,help="每一个轨迹点在多大的格子范围内计算权重")
+    parser.add_argument('--grid_mode', type=str, default="soft" ,help="原始hard grid 或者是soft gird")
+
+
     
     # model related
     parser.add_argument("--batch_size", type=int, default=64, help='batch size for training networks')

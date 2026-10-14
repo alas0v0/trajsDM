@@ -5,7 +5,7 @@ from utils.tools import pad_traj_tensor_to_fix_length, get_normalized_padded_tra
 
 
 class ConvTrajDatset(Dataset):
-    def __init__(self, traj_dataset, max_length, mean_and_std, range, grid):
+    def __init__(self, traj_dataset, max_length, mean_and_std, range, grid, grid_mode):
         super(ConvTrajDatset, self).__init__()
         self.mean_lon, self.mean_lat, self.std_lon, self.std_lat = mean_and_std
         self.lon_range, self.lat_range = range
@@ -14,6 +14,7 @@ class ConvTrajDatset(Dataset):
         self.x_grid_list = traj_dataset[3]
         self.y_grid_list = traj_dataset[4]
         self.traj_lens = traj_dataset[2]
+        self.grid_mode = grid_mode
         self.dataset_num = len(self.traj_coor)
         self.traj_ids = torch.arange(0, self.dataset_num).int()
 
@@ -25,7 +26,11 @@ class ConvTrajDatset(Dataset):
         self.padded_tarjs_coor = pad_traj_tensor_to_fix_length(self.traj_coor, max_length, pad_value=0.0)  # shape: [self.dataset_num, max_length, 2]
         self.trajs_mask = get_padded_mask(self.padded_tarjs_coor)  # shape: [self.datset_num, max_length]
         #soft image
-        self.traj_images = self.image_encode_soft(self.padded_tarjs_coor, self.trajs_mask, self.grid)
+        if grid_mode == "soft":
+            self.traj_images = self.image_encode_soft(self.padded_tarjs_coor, self.trajs_mask, self.grid)
+        elif grid_mode == "hard":
+            self.traj_images = self.image_encode(self.x_grid_list, self.y_grid_list, self.grid.grid_num_x, self.grid.grid_num_y)
+            self.traj_images = torch.tensor(self.traj_images,dtype=torch.float32,)
         # self.padded_normalized_trajs_coor =get_normalized_padded_traj(self.padded_tarjs_coor, self.trajs_mask,self.mean_lon, self.mean_lat, self.std_lon, self.std_lat)  # shape: [self.dataset_num, max_length, 2]
         self.padded_normalized_trajs_coor = get_normalized_padded_traj_convtraj(self.padded_tarjs_coor, self.trajs_mask, self.lon_range[0], self.lat_range[0])
 
@@ -69,7 +74,7 @@ class ConvTrajDatset(Dataset):
         temp = max(float(temperature), 1e-12)
 
         neighbor_offsets = torch.tensor(
-            [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)],
+            grid.get_neighbor_offsets(),
             device=device,
             dtype=torch.long,
         )
