@@ -97,7 +97,7 @@ def train_one_epoch_dualsim(model, train_dataloader, optimizer, criterion, devic
     epoch_loss = 0
     for idx, batch in enumerate(dataloader):
 
-        batch_idx, trajs, weight, linear_idx, trajs_mask = batch[0].to(device), batch[1].to(device), batch[2].to(device), batch[3].to(device), batch[4].to(device)
+        batch_idx, trajs, weights, linear_idx, trajs_mask = batch[0].to(device), batch[1].to(device), batch[2].to(device), batch[3].to(device), batch[4].to(device)
 
         # batch内打乱traj_ids
         shuffled_batch_idx = torch.randperm(batch_idx.shape[0])
@@ -107,16 +107,13 @@ def train_one_epoch_dualsim(model, train_dataloader, optimizer, criterion, devic
         batch_sim = similarity[batch_idx, shuffled_idx]  # 相似度
     
         # forward
-        traj_vecs = model(trajs, trajs_grid, trajs_mask)
+        traj_vecs = model(trajs, weights, linear_idx, trajs_mask)
         loss = criterion(traj_vecs, traj_vecs[shuffled_batch_idx], batch_sim) # mse loss 两个向量之间的距离与真实距离(负对数归一化处理后的结果)计算loss        
                 
         # backward
         epoch_loss += loss.item()  # total loss of this epoch  
-
-        #################### Gradient descent and backpropagation  ####################
         optimizer.zero_grad()
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=4.0)  # Prevent gradient explosion.
         optimizer.step()
     end_time = time.time()  
     return epoch_loss / (idx + 1), end_time - start_time  # 返回每个batch的平均loss, 训练一个epoch所用的时间   

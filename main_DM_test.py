@@ -92,7 +92,8 @@ x_syn = nn.ParameterList(x_syn)  # 初始化后的合成轨迹
 optimizer_data = torch.optim.SGD(x_syn, lr=args.lr_traj, momentum=0.5)  # 用于更新数据的优化器, 对应原始的optimizer_img
 
 
-all_acc = {m: {} for m in model_eval_pool}  # 所有测得的acc和training time, 最后可删除
+# all_acc = {m: {} for m in model_eval_pool}  # 所有测得的acc和training time, 最后可删除
+all_acc = []
 
 best_acc: dict[str, torch.Tensor] = {}
 best_acc_training_time: dict[str, float] = {}
@@ -172,7 +173,7 @@ for it in range(0, args.Iteration + 1):  # 第it次更新合成数据集
 
             cur_best_acc[model_eval] = torch.stack(best_topk_acc_list).mean(0)  # args.num_eval个模型最好效果的均值
             cur_best_acc_training_time[model_eval] = sum(training_time_list) / len(training_time_list)  # args.num_eval个模型训练时长的均值
-            all_acc[model_eval][it] = cur_best_acc[model_eval], cur_best_acc_training_time[model_eval]
+            all_acc.append((cur_best_acc[model_eval], cur_best_acc_training_time[model_eval])) 
 
         # model_eval_pool中模型所有指标均值中，有一半以上有所提升, 则说明该浓缩数据集更好
         if not best_acc:

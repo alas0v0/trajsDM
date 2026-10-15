@@ -95,7 +95,7 @@ for e in range(args.train_epochs):
 final_test_topk_acc, final_test_time = test(model, test_dataloader, args)
 log_and_print( "Final Test:\tEpoch: {}\t{}@Top-k Acc:{}\tTest time:{}\n".format( args.train_epochs - 1, args.target_measure.upper(), final_test_topk_acc, final_test_time ) )
 end_time = time.time()
-
+best_test_topk_acc = torch.tensor(list(best_test_topk_acc.values()))
 log_and_print(f"\n\nbest eval topk acc: {best_eval_topk_acc}")
 log_and_print(f"\n\nbest test topk acc: {best_test_topk_acc}")
 log_and_print(f"best epoch: {best_epoch}")

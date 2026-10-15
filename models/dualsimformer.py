@@ -23,10 +23,12 @@ class DualSIMformer(nn.Module):
         
         self.linear = nn.Linear(2 * hidden_dim, hidden_dim)
 
-    def forward(self, x, x_grid, padding_masks):
+    def forward(self, x, traj_ids, padding_masks):
 
         x = self.simformer1(x, padding_masks)
-        grid_embeddings = self.embs(x_grid.long())
+        # neighbor_embeddings = self.embs(linear_idx.long())#b, l, embedding size
+        grid_embeddings = self.embs(traj_ids.long())#b, l, embedding size
+        # grid_embeddings = (neighbor_embeddings * weights.unsqueeze(-1) ).sum(dim=-2)
         grid_x = self.simformer2(grid_embeddings, padding_masks)
 
         final_x = torch.concat((x, grid_x), dim = -1)

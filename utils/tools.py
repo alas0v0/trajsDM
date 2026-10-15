@@ -34,6 +34,9 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+    torch.use_deterministic_algorithms(True)
 
 
 def pad_traj_tensor_to_fix_length(traj_list, max_length, pad_value=0.0):

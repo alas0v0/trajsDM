@@ -34,7 +34,7 @@ class TrajSimLeaDataLoader():
         self.lat_range = traj_data.lat_range
         self.grid = traj_data.grid
         #soft_grid
-        self.grid.temperature = args.temperature
+        # self.grid.temperature = args.temperature
 
         if self.mode == "syn":
             self.trajs, self.dist_matrix = self.data

@@ -19,29 +19,29 @@ def build_parser():
 
     # experiment related
     parser.add_argument("--dataset", type=str, default="porto", choices=["porto","geolife","ais","tdrive"], help='Dataset.')
-    parser.add_argument('--model', type=str, default='ConvTraj', choices=["ConvTraj", "TrajCL", "DualSIMformer", "SIMformer", "GRU", "LSTM", "Linear"], help='model')
+    parser.add_argument('--model', type=str, default='DualSIMformer', choices=["ConvTraj", "TrajCL", "DualSIMformer", "SIMformer", "GRU", "LSTM", "Linear"], help='model')
     parser.add_argument("--config_path", type=str, default="./config.yaml", help="config file path")
-    parser.add_argument('--gpu_id', type=int, default=2, help='gpu id used') 
+    parser.add_argument('--gpu_id', type=int, default=0, help='gpu id used') 
     parser.add_argument('--seed', type=int, default=0, help='seed')
 
     # grid index related
     parser.add_argument('--grid_size', type=float, default=0.01, help='测试合成数据集效果、MTT训练training track和DC内层训练时的l2 regularization')
     parser.add_argument('--grid_emb_size', type=int, default=32, help="grid编码成向量的长度")
-    parser.add_argument('--temperature', type=float, default=0.2 ,help="生成连续image用到的超参数")
+    # parser.add_argument('--temperature', type=float, default=0.7 ,help="生成连续image用到的超参数")
     
     # model related
-    parser.add_argument("--batch_size", type=int, default=32, help='batch size for training networks')
+    parser.add_argument("--batch_size", type=int, default=64, help='batch size for training networks')
     parser.add_argument('--train_epochs', type=int, default=100, help="训练模型的轮数, training track的长度为train_epochs+1")
     parser.add_argument('--hidden_dim', type=int, default=128, help="轨迹编码成向量的长度")
     parser.add_argument("--opt_method", type=str, default="adam", choices=["adam", "sgd"], help="优化方法类型")
-    parser.add_argument("--loss_type", type=str, default="triplet", choices=["triplet", "mse"], help="优化方法类型")
+    parser.add_argument("--loss_type", type=str, default="mse", choices=["triplet", "mse"], help="优化方法类型")
     parser.add_argument('--mom', type=float, default=0.9, help='测试合成数据集效果、MTT训练training track和DC内层训练时的momentum')
     parser.add_argument('--l2', type=float, default=0, help='测试合成数据集效果、MTT训练training track和DC内层训练时的l2 regularization')
 
     # Trajectory similarity measures related
     parser.add_argument("--sampling_num", type=int, default=1, help="为了效率做了修改, 本质上没有用到; how many target trajectories to select for anchor trajectory when training the trajectory encoding model") 
-    parser.add_argument("--target_measure", type=str, default="dtw", choices=["dtw","haus","fret"], help="distance measures for ground truth similarity")
-    parser.add_argument("--emb_sim_metric", type=str, default="euc", choices=["cos","euc","chebyshev"], help="representation simialrity function") 
+    parser.add_argument("--target_measure", type=str, default="fret", choices=["dtw","haus","fret"], help="distance measures for ground truth similarity")
+    parser.add_argument("--emb_sim_metric", type=str, default="chebyshev", choices=["cos","euc","chebyshev"], help="representation simialrity function") 
 
     # dataset condensation related
     parser.add_argument('--distill_output_path', type=str, default='./distill_files_test', help='distill output dir')
