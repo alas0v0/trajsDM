@@ -28,7 +28,7 @@ if args.opt_method == "adam":
 elif args.opt_method == "sgd":
     lr_mom_str = "opt_method_" + args.opt_method + "_lr_teacher" + str(config["model"][args.model]["lr_teacher"][args.opt_method]).replace(".", "dot") + "_mom" + str(args.mom).replace(".", "dot") + "_l2" + str(args.l2).replace(".", "dot")
 
-save_dir = os.path.join(args.file_output, args.dataset, args.target_measure, args.emb_sim_metric, "FullTrainingDataset", args.model, lr_mom_str, curr_time)
+save_dir = os.path.join(args.file_output_path, args.dataset, args.target_measure, args.emb_sim_metric, "FullTrainingDataset", args.model, lr_mom_str, curr_time)
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 yaml.dump(dict(vars(args)), open(os.path.join(save_dir, 'config.yaml'), 'w'))  # 将实验参数写入args.save_dir中的config.yaml文件
@@ -94,6 +94,20 @@ for e in range(args.train_epochs):
         test_topk_acc_per_track, test_time = test(model, test_dataloader, args)
         best_test_topk_acc = test_topk_acc_per_track
         log_and_print("Test:\tEpoch: {}\t{}@Top-k Acc:{}\tTest time:{}\n".format(e, args.target_measure.upper(), test_topk_acc_per_track, test_time))
+        #保存checkpoint
+        checkpoint = {
+            "model_state_dict": model.state_dict(),
+            "epoch": e,
+            "model": args.model,
+            "dataset": args.dataset,
+            "target_measure": args.target_measure,
+            "hidden_dim": args.hidden_dim,
+            "grid_size": args.grid_size,
+            "grid_mode": args.grid_mode,
+            "temperature": args.temperature,
+            "neighbor_num": args.neighbor_num,
+        }
+        torch.save(checkpoint, os.path.join(save_dir, "best_model.pt"))
 final_test_topk_acc, final_test_time = test(model, test_dataloader, args)
 log_and_print( "Final Test:\tEpoch: {}\t{}@Top-k Acc:{}\tTest time:{}\n".format( args.train_epochs - 1, args.target_measure.upper(), final_test_topk_acc, final_test_time ) )
 end_time = time.time()

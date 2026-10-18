@@ -45,16 +45,21 @@ def test(model, test_dataloader, args):
     end_time = time.time() 
     return topk_acc, end_time - start_time
 
-def getEmbeddings(model, model_name, trajs, device, traj_data:TrajData):
+def getEmbeddings(model, model_name, trajs, device, traj_data:TrajData, grid_mode="soft"):
     #trajs list[N]
     model.eval()   
     if model_name == "ConvTraj":
         padded_trajs = pad_traj_tensor_to_fix_length(trajs, traj_data.max_traj_len, pad_value=0.0)
         trajs_mask = get_padded_mask(padded_trajs)
+        if grid_mode =="soft":
+            images = ConvTrajDatset.image_encode_soft(padded_trajs, trajs_mask, traj_data.grid)
+        elif grid_mode == "hard":
+            _, x_grid_list,y_grid_list, _, _ = TrajData.getTrajs(trajs, traj_data.grid)
+            images = ConvTrajDatset.image_encode(x_grid_list, y_grid_list, traj_data.grid.grid_num_x, traj_data.grid.grid_num_y)
+            images = torch.tensor(images,dtype=torch.float32)
 
-        images = ConvTrajDatset.image_encode_soft(padded_trajs, trajs_mask, traj_data.grid)
-
-        padded_normalized_trajs =get_normalized_padded_traj_convtraj(padded_trajs, trajs_mask, traj_data.lon_range[0],  traj_data.lat_range[0])
+        # padded_normalized_trajs =get_normalized_padded_traj_convtraj(padded_trajs, trajs_mask, traj_data.lon_range[0],  traj_data.lat_range[0])
+        padded_normalized_trajs = get_normalized_padded_traj(padded_trajs, trajs_mask, traj_data.mean_lon, traj_data.mean_lat, traj_data.std_lon, traj_data.std_lat)
         padded_normalized_trajs = padded_normalized_trajs.to(device)
         images = images.to(device)
         traj_vecs = model.encode(padded_normalized_trajs[:,:, 0:1], padded_normalized_trajs[:,:, 1:2], images) 
@@ -85,7 +90,15 @@ def getEmbeddings(model, model_name, trajs, device, traj_data:TrajData):
     elif model_name == "DualSIMformer":
         trajs_padding = pad_sequence(trajs, batch_first=True) #得到padding trajs
         trajs_mask = get_padded_mask(trajs_padding)
-        weights, linear_idx = TrajSimLeaDataLoader.getWeights(trajs_padding, trajs_mask, traj_data.grid)
+        if grid_mode == "soft":
+            weights, linear_idx = TrajSimLeaDataLoader.getWeights(trajs_padding, trajs_mask, traj_data.grid)
+        elif grid_mode == "hard":
+            _, _,_, grid_trajs, _ = TrajData.getTrajs(trajs, traj_data.grid)
+            grid_trajs = [torch.tensor(grid_ids, dtype=torch.long) for grid_ids in grid_trajs]
+            padded_grid_trajs = pad_sequence(grid_trajs, batch_first=True, padding_value=0)
+            linear_idx = padded_grid_trajs.long().unsqueeze(-1)
+            weights = torch.ones(linear_idx.shape, dtype=trajs_padding.dtype, device=trajs_padding.device)
+        
         padded_normalized_trajs = get_normalized_padded_traj(trajs_padding, trajs_mask, traj_data.mean_lon, traj_data.mean_lat, traj_data.std_lon, traj_data.std_lat)
         padded_normalized_trajs,  weights, linear_idx, trajs_mask = padded_normalized_trajs.to(device),  weights.to(device), linear_idx.to(device), trajs_mask.to(device)
         traj_vecs = model.forward(padded_normalized_trajs, weights, linear_idx, trajs_mask)
@@ -96,3 +109,13 @@ def getEmbeddings(model, model_name, trajs, device, traj_data:TrajData):
         padded_trajs = get_normalized_padded_traj(padded_trajs, trajs_mask,traj_data.mean_lon,  traj_data.mean_lat,  traj_data.std_lon,  traj_data.std_lat) 
         traj_vecs = model.forward(padded_trajs, trajs_mask)  # 将轨迹编码为向量
     return traj_vecs
+
+def getEmbeddingsFromFull(model, model_name, trajs, args, traj_data:TrajData, batch_size=128):
+    embedding_batches = []
+    model.eval()
+    with torch.no_grad():
+        for start in range(0, len(trajs), batch_size):
+            batch_trajs = trajs[start:start + batch_size]
+            batch_embeddings = getEmbeddings(model, model_name, batch_trajs, args.device, traj_data, args.grid_mode)
+            embedding_batches.append(batch_embeddings.cpu())
+    return torch.cat(embedding_batches, dim=0)

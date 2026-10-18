@@ -31,10 +31,11 @@ def build_parser():
     parser.add_argument('--neighbor_num', type=int, default=3 ,help="每一个轨迹点在多大的格子范围内计算权重")
     parser.add_argument('--grid_mode', type=str, default="soft" ,help="原始hard grid 或者是soft gird")
 
-
+    parser.add_argument('--use_embedding_label', type=str, default="False" ,help="是否使用emb label")
+    parser.add_argument("--teacher_checkpoint", type=str, default=None, help="用于生成 embedding label 的预训练模型路径")
     
     # model related
-    parser.add_argument("--batch_size", type=int, default=64, help='batch size for training networks')
+    parser.add_argument("--batch_size", type=int, default=32, help='batch size for training networks')
     parser.add_argument('--train_epochs', type=int, default=100, help="训练模型的轮数, training track的长度为train_epochs+1")
     parser.add_argument('--hidden_dim', type=int, default=128, help="轨迹编码成向量的长度")
     parser.add_argument("--opt_method", type=str, default="adam", choices=["adam", "sgd"], help="优化方法类型")
@@ -49,8 +50,8 @@ def build_parser():
 
     # dataset condensation related
     parser.add_argument('--distill_output_path', type=str, default='./distill_files_test', help='distill output dir')
-    parser.add_argument('--file_output', type=str, default='./soft_files_test', help='distill output dir')
-    parser.add_argument('--syn_num', type=int, default=100, help='合成数据集的大小')
+    parser.add_argument('--file_output_path', type=str, default='./soft_files_test', help='distill output dir')
+    parser.add_argument('--syn_num', type=int, default=300, help='合成数据集的大小')
     parser.add_argument('--Iteration', type=int, default=500, help='更新多少次浓缩数据集; how many distillation steps to perform')
     parser.add_argument('--lr_traj', type=float, default=0.1, help='learning rate for updating synthetic trajectories')
     parser.add_argument('--use_syn_minibatch', type=int, default=25, help='就是b_{t+n};每次更新浓缩数据集时, sample出的minibatch的数量, None表示用整个浓缩数据集来更新')

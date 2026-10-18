@@ -15,9 +15,12 @@ from utils.syn_data_ini import k_medoids_sampling
 from utils.loss import initialize_loss
 from models import get_model
 from dataloader import TrajSimLeaDataLoader
-from evaluate import test, getEmbeddings
+from evaluate import test, getEmbeddings, getEmbeddingsFromFull
 from train import train_one_epoch_convtraj, train_one_epoch_trajcl, train_one_epoch_other, train_one_epoch_dualsim
-
+from utils.similarity import emds2dist
+#测试的时候
+# 1. convtraj合成轨迹训练集，验证集和测试集都用离散dataloader, 模型不变
+# 2. dualsimformer weights b,l,1 代表距离一个格子的权重，不等于1，再collate里面设置为1
 args = parse_args()
 with open(args.config_path) as f:
     config = yaml.safe_load(f)
@@ -37,9 +40,9 @@ set_seed(args.seed)
 args.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
 
 traj_data = TrajData(args.dataset, args.target_measure, config["datasets"], args.grid_size)
-train_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="train")
-eval_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="eval")
-test_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="test")
+train_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="train", grid_mode=args.grid_mode)
+eval_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="eval", grid_mode=args.grid_mode)
+test_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="test", grid_mode=args.grid_mode)
 
 # 储存evaluation的iteration number [0, 100, 200...]
 eval_it_pool = np.arange(0, args.Iteration + 1, args.eval_it).tolist()
@@ -75,14 +78,26 @@ elif args.syn_ini == "randomly_generated":
     y_syn = (A + A.T) / 2
     y_syn[torch.arange(args.syn_num), torch.arange(args.syn_num)] = 0.0
 
-
+#判断是否使用emb label
+if args.use_embedding_label == "True" and args.teacher_checkpoint is not None:
+    log_and_print(f"use emb label, {args.teacher_checkpoint}")
+    teacher = get_model(args, config, traj_data)
+    checkpoint = torch.load(args.teacher_checkpoint, map_location=args.device)
+    teacher.load_state_dict(checkpoint["model_state_dict"])
+    teacher.eval()
+    for param in teacher.parameters():
+        param.requires_grad_(False)
+    teacher_embeddings = getEmbeddingsFromFull(teacher, args.model, x_syn, args, traj_data)  
+    # teacher_dist = emds2dist(teacher_embeddings,"euc")#TODO
+    teacher_dist = emds2dist(teacher_embeddings, args.emb_sim_metric)
+    y_syn = teacher_dist.detach().clone().to(args.device)
 criterion = initialize_loss(args).to(args.device)
 
 x_syn = nn.ParameterList(x_syn)  # 初始化后的合成轨迹
 optimizer_data = torch.optim.SGD(x_syn, lr=args.lr_traj, momentum=0.5)  # 用于更新数据的优化器, 对应原始的optimizer_img
 
 
-all_acc = {m: {} for m in model_eval_pool}  # 所有测得的acc和training time, 最后可删除
+all_acc = []  # 所有测得的acc和training time, 最后可删除
 
 best_acc: dict[str, torch.Tensor] = {}
 best_acc_training_time: dict[str, float] = {}
@@ -109,7 +124,7 @@ for it in range(0, args.Iteration + 1):  # 第it次更新合成数据集
                 # 随机初始化一个模型
                 net_eval = get_model(args, config, traj_data)
                 # 得到data
-                train_dataloader_eval = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="syn", syn_data = (eval_x_syn, eval_y_syn) )
+                train_dataloader_eval = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="syn", syn_data = (eval_x_syn, eval_y_syn), grid_mode=args.grid_mode)
                 # 得到学习率
                 lr_net = config["model"][args.model]["lr_teacher"][args.opt_method]  # 与真实数据相同
 
@@ -155,7 +170,7 @@ for it in range(0, args.Iteration + 1):  # 第it次更新合成数据集
 
             cur_best_acc[model_eval] = torch.stack(best_topk_acc_list).mean(0)  # args.num_eval个模型最好效果的均值
             cur_best_acc_training_time[model_eval] = sum(training_time_list) / len(training_time_list)  # args.num_eval个模型训练时长的均值
-            all_acc[model_eval][it] = cur_best_acc[model_eval], cur_best_acc_training_time[model_eval]
+            all_acc.append((cur_best_acc[model_eval], cur_best_acc_training_time[model_eval])) 
 
         # model_eval_pool中模型所有指标均值中，有一半以上有所提升, 则说明该浓缩数据集更好
         if not best_acc:
@@ -196,10 +211,12 @@ for it in range(0, args.Iteration + 1):  # 第it次更新合成数据集
         real_minibatch_idx.extend(list(range(idx * args.use_num_real_per_syn, (idx + 1) * args.use_num_real_per_syn))[:args.use_num_real_per_syn])
     x_real_minibatch = [train_dataloader.dataset.traj_coor[i] for i in real_minibatch_idx]
     
-    x_real_minibatch_vec = getEmbeddings(net, args.model, x_real_minibatch, args.device, traj_data)
+    # x_real_minibatch_vec = getEmbeddings(net, args.model, x_real_minibatch, args.device, traj_data,"soft")
+    x_real_minibatch_vec = getEmbeddings(net, args.model, x_real_minibatch, args.device, traj_data,args.grid_mode)
     x_real_minibatch_vec = nn.functional.normalize(x_real_minibatch_vec, dim=1)
 
-    x_syn_minibatch_vec = getEmbeddings(net, args.model, x_syn_minibatch, args.device, traj_data)
+    # x_syn_minibatch_vec = getEmbeddings(net, args.model, x_syn_minibatch, args.device, traj_data,"soft")
+    x_syn_minibatch_vec = getEmbeddings(net, args.model, x_syn_minibatch, args.device, traj_data,args.grid_mode)
     x_syn_minibatch_vec = nn.functional.normalize(x_syn_minibatch_vec, dim=1)
 
     loss += torch.sum((torch.mean(x_real_minibatch_vec, dim=0) - torch.mean(x_syn_minibatch_vec, dim=0))**2)
@@ -215,4 +232,6 @@ for it in range(0, args.Iteration + 1):  # 第it次更新合成数据集
     log_and_print(f"time cost: {end_time - start_time}")
 
 log_and_print(f"最终浓缩数据集效果: 第{it}个循环\nbest_acc:{best_acc}\ntraining_time:{best_acc_training_time}")
-log_and_print(f"每轮浓缩数据集效果：{all_acc}")
+log_and_print("每轮浓缩数据集效果：")
+for acc in all_acc:
+    log_and_print(acc)

@@ -138,12 +138,13 @@ class TrajSimLeaDataLoader():
 
         trajs_xy = pad_sequence(list(trajs_xy), batch_first=True) #得到padding trajs
         trajs_mask = get_padded_mask(trajs_xy)
-        weights, linear_idx = self.getWeights(trajs_xy[...,1:3], trajs_mask, self.grid)#B, L, 9
-
+        if self.grid_mode == "soft":
+            weights, linear_idx = self.getWeights(trajs_xy[...,1:3], trajs_mask, self.grid)#B, L, 9
+        elif self.grid_mode == "hard":
+            linear_idx = trajs_xy[...,0].long().unsqueeze(-1)
+            weights = torch.ones(linear_idx.shape, dtype=trajs_xy.dtype, device=trajs_xy.device, )
+            
         trajs = get_normalized_padded_traj(trajs_xy[...,1:3], trajs_mask, self.mean_lon, self.mean_lat, self.std_lon, self.std_lat)
-        # trajs_grid = trajs_xy[...,0]
-
-        # return trajs_ids, trajs, trajs_grid, trajs_mask
         return trajs_ids, trajs, weights, linear_idx, trajs_mask
 
     def collate_fn_other(self, data):
@@ -352,14 +353,15 @@ class TrajSimLeaDataLoader():
         inside = ( valid_bool.unsqueeze(-1) & (ngx >= 0) & (ngx < x_num) & (ngy >= 0) & (ngy < y_num) )
 
         ndist2 = (x.unsqueeze(-1) - (ngx.to(dtype) + 0.5)) ** 2 + (y.unsqueeze(-1) - (ngy.to(dtype) + 0.5)) ** 2
-        # logits = -ndist2 / temp
-        # logits = torch.where(inside, logits, torch.full_like(logits, -1e9))
-        # weights = torch.softmax(logits, dim=-1)
-        weights=1/(1+ (ndist2 / temp)**2)
-        weights = torch.where(inside, weights, torch.zeros_like(weights))
-        #weights 归一化
-        weight_sum = weights.sum(dim=-1, keepdim=True)
-        weights = weights / weight_sum.clamp_min(1e-12)
+
+        logits = -ndist2 / temp
+        logits = torch.where(inside, logits, torch.full_like(logits, -1e9))
+        weights = torch.softmax(logits, dim=-1)
+        # weights=1/(1+ (ndist2 / temp)**2)
+        # weights = torch.where(inside, weights, torch.zeros_like(weights))
+        # #weights 归一化
+        # weight_sum = weights.sum(dim=-1, keepdim=True)
+        # weights = weights / weight_sum.clamp_min(1e-12)
         
         linear_idx = ngy * x_num + ngx
         linear_idx = torch.where(inside, linear_idx, torch.zeros_like(linear_idx), )

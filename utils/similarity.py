@@ -85,3 +85,16 @@ def emds2sim(emds, metric="euc"):
         sim_matrix = torch.exp(-chebyshev_distance_matrix(emds))
     
     return sim_matrix
+
+def emds2dist(emds, metric="euc"):
+    if metric == "euc":
+        dist_matrix = torch.cdist(emds, emds, p=2)
+    elif metric == "cos":
+        sim_matrix = pairwise_cosine_similarity( emds, zero_diagonal=False, )
+        dist_matrix = 1.0 - sim_matrix
+    elif metric == "chebyshev":
+        dist_matrix = chebyshev_distance_matrix(emds)
+    dist_matrix.fill_diagonal_(0.0)
+    return dist_matrix
+
+

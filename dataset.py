@@ -30,9 +30,10 @@ class ConvTrajDatset(Dataset):
             self.traj_images = self.image_encode_soft(self.padded_tarjs_coor, self.trajs_mask, self.grid)
         elif grid_mode == "hard":
             self.traj_images = self.image_encode(self.x_grid_list, self.y_grid_list, self.grid.grid_num_x, self.grid.grid_num_y)
-            self.traj_images = torch.tensor(self.traj_images,dtype=torch.float32,)
-        # self.padded_normalized_trajs_coor =get_normalized_padded_traj(self.padded_tarjs_coor, self.trajs_mask,self.mean_lon, self.mean_lat, self.std_lon, self.std_lat)  # shape: [self.dataset_num, max_length, 2]
-        self.padded_normalized_trajs_coor = get_normalized_padded_traj_convtraj(self.padded_tarjs_coor, self.trajs_mask, self.lon_range[0], self.lat_range[0])
+            self.traj_images = torch.tensor(self.traj_images,dtype=torch.float32)
+            
+        self.padded_normalized_trajs_coor =get_normalized_padded_traj(self.padded_tarjs_coor, self.trajs_mask,self.mean_lon, self.mean_lat, self.std_lon, self.std_lat)  # shape: [self.dataset_num, max_length, 2]
+        # self.padded_normalized_trajs_coor = get_normalized_padded_traj_convtraj(self.padded_tarjs_coor, self.trajs_mask, self.lon_range[0], self.lat_range[0])
 
 
     def __len__(self):
@@ -91,6 +92,10 @@ class ConvTrajDatset(Dataset):
         # weights = torch.softmax(logits, dim=-1)
         weights=1/(1+ (ndist2 / temp)**2)
         weights = torch.where(inside, weights, torch.zeros_like(weights))
+        # #weights 归一化
+        # weight_sum = weights.sum(dim=-1, keepdim=True)
+        # weights = weights / weight_sum.clamp_min(1e-12)
+
 
         linear_idx = ngx * y_num + ngy
         linear_idx = torch.where(inside, linear_idx, torch.zeros_like(linear_idx))
