@@ -74,7 +74,8 @@ def train_one_epoch_trajcl(model, train_dataloader, optimizer, criterion, device
 
 def train_one_epoch_dualsim(model, train_dataloader, optimizer, criterion, device):
     dataloader = train_dataloader.get_dataloader()  # 得到torch.utils.data.dataloader.DataLoader类的对象
-    similarity = train_dataloader.similarity.to(device)
+    # similarity = train_dataloader.similarity.to(device)
+    distance = train_dataloader.dis_matrix.to(device)
     start_time = time.time()
     model.train() 
     epoch_loss = 0
@@ -87,11 +88,14 @@ def train_one_epoch_dualsim(model, train_dataloader, optimizer, criterion, devic
         shuffled_idx = batch_idx[shuffled_batch_idx]
 
         # 找相似度
-        batch_sim = similarity[batch_idx, shuffled_idx]  # 相似度
+        # batch_sim = similarity[batch_idx, shuffled_idx]  # 相似度
+        #distance
+        batch_dist = distance[batch_idx, shuffled_idx]
     
         # forward
         traj_vecs = model(trajs, weights, linear_idx, trajs_mask)
-        loss = criterion(traj_vecs, traj_vecs[shuffled_batch_idx], batch_sim) # mse loss 两个向量之间的距离与真实距离(负对数归一化处理后的结果)计算loss        
+        # loss = criterion(traj_vecs, traj_vecs[shuffled_batch_idx], batch_sim) # mse loss 两个向量之间的距离与真实距离(负对数归一化处理后的结果)计算loss        
+        loss = criterion(traj_vecs, traj_vecs[shuffled_batch_idx], batch_dist) # mse loss 两个向量之间的距离与真实距离(负对数归一化处理后的结果)计算loss        
                 
         # backward
         epoch_loss += loss.item()  # total loss of this epoch  
@@ -108,11 +112,7 @@ def train_one_epoch_other(model, train_dataloader, optimizer, criterion, device)
     model.train() 
     epoch_loss = 0
     for idx, batch in enumerate(dataloader):
-        padded_trajs, batch_idx = batch[0].to(device), batch[1].to(device)
-
-        # anchor trajs
-        trajs_mask = train_dataloader.dataset.get_padded_mask(padded_trajs)
-        padded_trajs = train_dataloader.dataset.get_normalized_padded_traj(padded_trajs, trajs_mask)
+        padded_trajs, trajs_mask, batch_idx = batch[0].to(device), batch[1].to(device), batch[2].to(device)
 
         # target trajs idx (padded_trajs打乱)
         shuffled_batch_idx = torch.randperm(padded_trajs.shape[0])

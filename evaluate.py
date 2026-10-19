@@ -32,9 +32,7 @@ def test(model, test_dataloader, args):
                 traj_vecs = model(trajs, weights, linear_idx, trajs_mask)
 
             elif model_name in ["SIMformer", "GRU", "LSTM", "Linear"]:
-                padded_trajs, IDs = batch[0].to(args.device), batch[1].to(args.device)
-                trajs_mask = get_padded_mask(padded_trajs)
-                padded_trajs = get_normalized_padded_traj(padded_trajs, trajs_mask, mean_lon, mean_lat, std_lon, std_lat) 
+                padded_trajs, trajs_mask, IDs = batch[0].to(args.device), batch[1].to(args.device), batch[2].to(args.device)
                 traj_vecs = model.forward(padded_trajs, trajs_mask)  # 将轨迹编码为向量
             else:
                 raise ValueError("不支持该模型")
@@ -107,6 +105,7 @@ def getEmbeddings(model, model_name, trajs, device, traj_data:TrajData, grid_mod
         padded_trajs = pad_sequence(list(trajs), batch_first=True) #得到padding trajs
         trajs_mask = get_padded_mask(padded_trajs)
         padded_trajs = get_normalized_padded_traj(padded_trajs, trajs_mask,traj_data.mean_lon,  traj_data.mean_lat,  traj_data.std_lon,  traj_data.std_lat) 
+        padded_trajs, trajs_mask = padded_trajs.to(device), trajs_mask.to(device)
         traj_vecs = model.forward(padded_trajs, trajs_mask)  # 将轨迹编码为向量
     return traj_vecs
 

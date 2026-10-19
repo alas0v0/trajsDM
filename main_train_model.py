@@ -37,7 +37,7 @@ log_ini(save_dir)
 set_seed(args.seed)
 args.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
 grid_mode = args.grid_mode
-
+print(grid_mode)
 traj_data = TrajData(args.dataset, args.target_measure, config["datasets"], args.grid_size)
 train_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="train",grid_mode=grid_mode)
 eval_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="eval",grid_mode=grid_mode)

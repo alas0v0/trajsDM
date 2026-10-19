@@ -67,6 +67,16 @@ def pairwise_emd2sim(v1, v2, metric="euc"):
         sim_score = torch.exp(-chebyshev_distance(v1, v2))
     return sim_score    
 
+def pairwise_emd2dist(v1, v2, metric="euc"):
+    """Calculate pairwise embedding distance for the selected metric."""
+    if metric == "euc":
+        return torch.linalg.vector_norm(v1 - v2, ord=2, dim=-1)
+    if metric == "cos":
+        return 1.0 - nn.CosineSimilarity(dim=-1)(v1, v2)
+    if metric == "chebyshev":
+        return chebyshev_distance(v1, v2)
+    raise ValueError(f"Unsupported embedding metric: {metric}")
+
 def emds2sim(emds, metric="euc"):
     """ DTW时, 计算向量间cos距离; Haus/费雷歇时, 计算向量间切比雪夫距离并用负对数处理
     Given embedding vectors, calculate the similarity matrix. Supports cos, euc, chebyshev.

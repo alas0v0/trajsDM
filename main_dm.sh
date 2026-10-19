@@ -28,7 +28,7 @@ common_args=(
     --gpu_id 0
     --seed 0
     --syn_num 300
-    --batch_size 32
+    --batch_size 64
     --loss_type mse
     --temperature 0.7
     --neighbor_num 3
@@ -37,9 +37,13 @@ common_args=(
     --grid_mode soft
     --use_embedding_label True
     --epoch_eval_train 100
+    --opt_method adam
     # --teacher_checkpoint /home/zhutairu/workplace/learning/test/soft_files_test/porto/fret/chebyshev/FullTrainingDataset/DualSIMformer/opt_method_adam_lr_teacher0dot0005/20261016-181627/best_model.pt
     # --teacher_checkpoint /home/zhutairu/workplace/learning/test/soft_files_test/porto/haus/chebyshev/FullTrainingDataset/DualSIMformer/opt_method_adam_lr_teacher0dot0005/20261016-173010/best_model.pt
-    --teacher_checkpoint /home/zhutairu/workplace/learning/test/soft_files_test/porto/dtw/cos/FullTrainingDataset/DualSIMformer/opt_method_adam_lr_teacher0dot0005/20261016-092434/best_model.pt
+    # --teacher_checkpoint /home/zhutairu/workplace/learning/test/soft_files_test/porto/dtw/cos/FullTrainingDataset/DualSIMformer/opt_method_adam_lr_teacher0dot0005/20261016-092434/best_model.pt
+    # --teacher_checkpoint /home/zhutairu/workplace/learning/test/soft_files_test/porto/dtw/cos/FullTrainingDataset/DualSIMformer/opt_method_sgd_lr_teacher0dot5_mom0dot9_l20/20261018-152803/best_model.pt
+    # --teacher_checkpoint /home/zhutairu/workplace/learning/test/soft_files_test/porto/haus/chebyshev/FullTrainingDataset/DualSIMformer/opt_method_sgd_lr_teacher0dot5_mom0dot9_l20/20261018-194535/best_model.pt
+    --teacher_checkpoint /home/zhutairu/workplace/learning/test/soft_files_test/porto/dtw/cos/FullTrainingDataset/DualSIMformer/opt_method_adam_lr_teacher0dot0005/20261018-231113/best_model.pt
 )
 
 # experiment_pairs=(

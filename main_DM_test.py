@@ -38,12 +38,11 @@ yaml.dump(dict(vars(args)), open(os.path.join(save_dir, 'config.yaml'), 'w'))  #
 log_ini(save_dir)
 set_seed(args.seed)
 args.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
-
+log_and_print(args.grid_mode)
 traj_data = TrajData(args.dataset, args.target_measure, config["datasets"], args.grid_size)
 train_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="train", grid_mode=args.grid_mode)
 eval_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="eval", grid_mode=args.grid_mode)
 test_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="test", grid_mode=args.grid_mode)
-
 # 储存evaluation的iteration number [0, 100, 200...]
 eval_it_pool = np.arange(0, args.Iteration + 1, args.eval_it).tolist()
 # model_eval_pool是模型名字的list, 测试合成数据集效果时, 都测试哪些模型的训练效果

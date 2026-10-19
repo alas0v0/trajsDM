@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as functional
-from utils.similarity import pairwise_emd2sim
+from utils.similarity import pairwise_emd2sim, pairwise_emd2dist
 
 
 def initialize_loss(args):
@@ -22,10 +22,12 @@ class SimpleMSELoss(nn.Module):
         print(f"[Loss Function] Using SimpleMSELoss")
         
     def get_pred_sim(self, traj_vecs1, traj_vecs2):
-        return pairwise_emd2sim(traj_vecs1, traj_vecs2, self.emb_sim_metric)
+        # return pairwise_emd2sim(traj_vecs1, traj_vecs2, self.emb_sim_metric)
+        return pairwise_emd2dist(traj_vecs1, traj_vecs2, self.emb_sim_metric)
+
     
     def forward(self, traj_vecs1, traj_vecs2, target_dist):
-        pred_dist = pairwise_emd2sim(traj_vecs1, traj_vecs2, self.emb_sim_metric)
+        pred_dist = pairwise_emd2dist(traj_vecs1, traj_vecs2, self.emb_sim_metric)
         return self.mse(pred_dist, target_dist)
     
 

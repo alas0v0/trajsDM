@@ -40,7 +40,7 @@ class SIMformer(nn.Module):
         input = self.pos_enc(input)  # add positional encoding 后接一层dropout
         output = self.transformer_encoder(input, src_key_padding_mask=~padding_masks.bool())  # [batch_size*sampling_num, max_seq_len, hidden_dim]
         output = mean_pooling(output, padding_masks)  # 对输出的向量padding的地方置零后求均值 [batch_size*sampling_num, hidden_dim]
-        # output = self.act(output)  # 将x映射为hidden vector, [batch_size*sampling_num, hidden_dim]
+        output = self.act(output)  # 将x映射为hidden vector, [batch_size*sampling_num, hidden_dim]
         return output
 
 

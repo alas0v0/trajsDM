@@ -105,7 +105,7 @@ model:
   
   DualSIMformer:
     lr_teacher: 
-      sgd: 0.5 
+      sgd: 0.5
       adam: 0.0005
 
     # nhidden: 128

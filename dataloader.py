@@ -54,7 +54,7 @@ class TrajSimLeaDataLoader():
             self.dataset = TrajCLDataset(self.split_dataset, self.mean_lon, self.mean_lat, self.std_lon, self.std_lat)
             
         elif args.model == "DualSIMformer":
-                    self.dataset = TrajDualSimformer(self.split_dataset)
+            self.dataset = TrajDualSimformer(self.split_dataset)
 
         elif args.model in ["SIMformer", "LSTM", "GRU", "Linear"]:
             self.dataset = TrajSimLeaDataset(self.split_dataset, self.mean_lon, self.mean_lat, self.std_lon, self.std_lat)
@@ -150,7 +150,10 @@ class TrajSimLeaDataLoader():
     def collate_fn_other(self, data):
         trajs, indices = zip(*data)
         padded_trajs = pad_sequence(list(trajs), batch_first=True, padding_value=0)  # shape: [batch_size, max_seq_len, 2]
-        return padded_trajs, torch.tensor(indices)
+
+        trajs_mask = get_padded_mask(padded_trajs)
+        normalized_padded_trajs = get_normalized_padded_traj(padded_trajs, trajs_mask, self.mean_lon, self.mean_lat, self.std_lon, self.std_lat )
+        return normalized_padded_trajs, trajs_mask, torch.tensor(indices)
 
     def create_dataloader(self) -> DataLoader:
         pin_memory = False

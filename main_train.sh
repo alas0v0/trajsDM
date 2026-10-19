@@ -19,13 +19,15 @@ cd "$script_dir"
 common_args=(
     --dataset porto
     --model DualSIMformer
-    --gpu_id 0
+    --gpu_id 1
     --seed 0
     --batch_size 64
     --loss_type mse
     --target_measure dtw
     --emb_sim_metric cos
     --temperature 0.7
+    --opt_method adam
+    --grid_mode soft
 )
 
 python main_train_model.py "${common_args[@]}" 
