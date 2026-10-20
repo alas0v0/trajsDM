@@ -30,7 +30,17 @@ if args.syn_method == "DM":
     lr_mom_str = "" 
 else:
     lr_mom_str = "opt_method_" + args.opt_method + "_lr_teacher" + str(config["model"][args.model]["lr_teacher"][args.opt_method]).replace(".", "dot") + "_mom" + str(args.mom).replace(".", "dot") + "_l2" + str(args.l2).replace(".", "dot")
-save_dir = os.path.join(args.distill_output_path, args.dataset, args.target_measure, args.emb_sim_metric, args.syn_method, args.model, lr_mom_str, curr_time)
+
+if args.use_embedding_label == "True":
+    output_path = "./distill_files_emb"
+elif args.grid_mode == "soft":
+    output_path = "./soft_files_noemb"
+else:
+    output_path = args.distill_output_path
+
+save_dir = os.path.join(output_path, args.dataset, args.target_measure, args.emb_sim_metric, args.syn_method, args.model, lr_mom_str, curr_time)
+
+
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 yaml.dump(dict(vars(args)), open(os.path.join(save_dir, 'config.yaml'), 'w'))  # 将实验参数写入args.save_dir中的config.yaml文件
@@ -39,6 +49,7 @@ log_ini(save_dir)
 set_seed(args.seed)
 args.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
 log_and_print(args.grid_mode)
+log_and_print(save_dir)
 traj_data = TrajData(args.dataset, args.target_measure, config["datasets"], args.grid_size)
 train_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="train", grid_mode=args.grid_mode)
 eval_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="eval", grid_mode=args.grid_mode)
@@ -78,18 +89,19 @@ elif args.syn_ini == "randomly_generated":
     y_syn[torch.arange(args.syn_num), torch.arange(args.syn_num)] = 0.0
 
 #判断是否使用emb label
-if args.use_embedding_label == "True" and args.teacher_checkpoint is not None:
-    log_and_print(f"use emb label, {args.teacher_checkpoint}")
-    teacher = get_model(args, config, traj_data)
-    checkpoint = torch.load(args.teacher_checkpoint, map_location=args.device)
-    teacher.load_state_dict(checkpoint["model_state_dict"])
-    teacher.eval()
-    for param in teacher.parameters():
-        param.requires_grad_(False)
-    teacher_embeddings = getEmbeddingsFromFull(teacher, args.model, x_syn, args, traj_data)  
-    # teacher_dist = emds2dist(teacher_embeddings,"euc")#TODO
-    teacher_dist = emds2dist(teacher_embeddings, args.emb_sim_metric)
-    y_syn = teacher_dist.detach().clone().to(args.device)
+# if args.use_embedding_label == "True" and args.teacher_checkpoint is not None:
+#     log_and_print(f"use emb label, {args.teacher_checkpoint}")
+#     teacher = get_model(args, config, traj_data)
+#     checkpoint = torch.load(args.teacher_checkpoint, map_location=args.device)
+#     teacher.load_state_dict(checkpoint["model_state_dict"])
+#     teacher.eval()
+#     for param in teacher.parameters():
+#         param.requires_grad_(False)
+#     teacher_embeddings = getEmbeddingsFromFull(teacher, args.model, x_syn, args, traj_data)  
+#     teacher_dist = emds2dist(teacher_embeddings, args.emb_sim_metric)
+#     y_syn = teacher_dist.detach().clone().to(args.device)
+
+
 criterion = initialize_loss(args).to(args.device)
 
 x_syn = nn.ParameterList(x_syn)  # 初始化后的合成轨迹
@@ -106,6 +118,18 @@ for it in range(0, args.Iteration + 1):  # 第it次更新合成数据集
     save_this_it = False
     if it in eval_it_pool or it == args.Iteration:  # 到了测试合成数据集效果的it
         # 得到数据
+        if args.use_embedding_label == "True" and args.teacher_checkpoint is not None:
+            log_and_print(f"use emb label, {args.teacher_checkpoint}")
+            teacher = get_model(args, config, traj_data)
+            checkpoint = torch.load(args.teacher_checkpoint, map_location=args.device)
+            teacher.load_state_dict(checkpoint["model_state_dict"])
+            teacher.eval()
+            for param in teacher.parameters():
+                param.requires_grad_(False)
+            teacher_embeddings = getEmbeddingsFromFull(teacher, args.model, x_syn, args, traj_data)  
+            teacher_dist = emds2dist(teacher_embeddings, args.emb_sim_metric)
+            y_syn = teacher_dist.detach().clone().to(args.device)
+
         eval_x_syn = [x.detach() for x in x_syn]
         eval_y_syn = y_syn.detach()
 

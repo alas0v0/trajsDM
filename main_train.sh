@@ -12,14 +12,16 @@ cd "$script_dir"
 #     --seed 0
 #     --batch_size 64
 #     --loss_type triplet
-#     --target_measure fret
+#     --target_measure haus
 #     --emb_sim_metric euc
 #     --temperature 0.7
+#     --opt_method adam
+#     --grid_mode soft
 # )
 common_args=(
     --dataset porto
     --model DualSIMformer
-    --gpu_id 1
+    --gpu_id 0
     --seed 0
     --batch_size 64
     --loss_type mse

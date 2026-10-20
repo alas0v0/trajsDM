@@ -12,3 +12,7 @@ distill_files_test_300
 main_dm_new_gpu0.sh
 main_dm_new_gpu1.sh
 simformer
+distill_files_emb
+soft_files_noemb
+train_files
+distill_files

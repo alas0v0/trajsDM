@@ -1,6 +1,6 @@
 datasets:
   porto:
-    traj_data: "data/porto/porto_coord_10000.pkl"
+    traj_data: "/data/zhutairu/workplace/data/SIMformer_data/porto/porto_coord_10000.pkl"
     data_range:
       mean_lat: 41.16472526450768
       mean_lon: -8.620352509402363
@@ -9,9 +9,9 @@ datasets:
     lon_range: [-9.0, -7.9]
     lat_range: [40.7, 41.8]
     dis_matrix:
-      dtw: "data/porto/dis_matrix_dtw_10k.pkl"
-      haus: "data/porto/dis_matrix_haus_10k.pkl"
-      fret: "data/porto/dis_matrix_dfrec_10k.pkl"
+      dtw: "/data/zhutairu/workplace/data/SIMformer_data/porto/dis_matrix_dtw_10k.pkl"
+      haus: "/data/zhutairu/workplace/data/SIMformer_data/porto/dis_matrix_haus_10k.pkl"
+      fret: "/data/zhutairu/workplace/data/SIMformer_data/porto/dis_matrix_dfrec_10k.pkl"
   
   geolife:
     traj_data: "../SIMformerData/dataset/geolife/geolife_coord_10000.pkl"
@@ -107,6 +107,7 @@ model:
     lr_teacher: 
       sgd: 0.5
       adam: 0.0005
+      # adam: 0.0003
 
     # nhidden: 128
 
