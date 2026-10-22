@@ -16,3 +16,6 @@ distill_files_emb
 soft_files_noemb
 train_files
 distill_files
+debug.py
+debug_new.py
+method2：relational condensation.md

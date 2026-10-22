@@ -21,7 +21,7 @@ def build_parser():
     parser.add_argument("--dataset", type=str, default="porto", choices=["porto","geolife","ais","tdrive"], help='Dataset.')
     parser.add_argument('--model', type=str, default='ConvTraj', choices=["ConvTraj", "TrajCL", "DualSIMformer", "SIMformer", "GRU", "LSTM", "Linear"], help='model')
     parser.add_argument("--config_path", type=str, default="./config.yaml", help="config file path")
-    parser.add_argument('--gpu_id', type=int, default=0, help='gpu id used') 
+    parser.add_argument('--gpu_id', type=int, default=1, help='gpu id used') 
     parser.add_argument('--seed', type=int, default=0, help='seed')
 
     # grid index related
@@ -42,6 +42,7 @@ def build_parser():
     parser.add_argument("--loss_type", type=str, default="triplet", choices=["triplet", "mse"], help="优化方法类型")
     parser.add_argument('--mom', type=float, default=0.9, help='测试合成数据集效果、MTT训练training track和DC内层训练时的momentum')
     parser.add_argument('--l2', type=float, default=0, help='测试合成数据集效果、MTT训练training track和DC内层训练时的l2 regularization')
+    parser.add_argument('--gw_weights', type=float, default=0, help='gw_loss 的权重')
 
     # Trajectory similarity measures related
     parser.add_argument("--sampling_num", type=int, default=1, help="为了效率做了修改, 本质上没有用到; how many target trajectories to select for anchor trajectory when training the trajectory encoding model") 

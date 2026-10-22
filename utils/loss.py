@@ -86,3 +86,47 @@ class TripletLoss(nn.Module):
         return torch.mean(self.mlp_r * rank_loss_mlp),\
                torch.mean(self.m * torch.sqrt(mse_loss)),\
                torch.mean(self.mlp_r * rank_loss_mlp + self.m * torch.sqrt(mse_loss))
+
+
+def gw_loss_chunked(C_real, C_syn, T, real_block_size=256):
+    """
+    C_real: [n_real, n_real]
+    C_syn:  [n_syn, n_syn]
+    T:      [n_real, n_syn]
+
+    return:
+        标量 gw loss
+    """
+    p = T.sum(dim=1)  # [n_real]
+    q = T.sum(dim=0)  # [n_syn]
+
+    term_real = (C_real.pow(2) * torch.outer(p, p)).sum()
+    term_syn = (C_syn.pow(2) * torch.outer(q, q)).sum()
+
+    cross = C_real.new_zeros(())
+    Tt = T.transpose(0, 1)  # [n_syn, n_real]
+
+    n_real = C_real.shape[0]
+    for start in range(0, n_real, real_block_size):
+        end = min(start + real_block_size, n_real)
+
+        T_block = T[start:end]                  # [bs, n_syn]
+        M_block = T_block @ C_syn @ Tt         # [bs, n_real]
+        cross = cross + (C_real[start:end] * M_block).sum()
+
+    loss = term_real + term_syn - 2.0 * cross
+    return loss
+
+def dm_loss(x_syn_vec, x_real_vec, T):
+    # T: 合成轨迹，真实轨迹
+    T_sum = T.sum(dim=1, keepdim=True)
+    weighted_real = T @ x_real_vec
+    weighted_real_squared = T @ (x_real_vec ** 2)
+
+    weighted_diff = (
+        (x_syn_vec ** 2) * T_sum
+        - 2 * x_syn_vec * weighted_real
+        + weighted_real_squared
+    )
+
+    return torch.mean(torch.sum(weighted_diff, dim=1))

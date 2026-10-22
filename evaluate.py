@@ -109,12 +109,13 @@ def getEmbeddings(model, model_name, trajs, device, traj_data:TrajData, grid_mod
         traj_vecs = model.forward(padded_trajs, trajs_mask)  # 将轨迹编码为向量
     return traj_vecs
 
-def getEmbeddingsFromFull(model, model_name, trajs, args, traj_data:TrajData, batch_size=128):
+def getEmbeddingsFromFull(model, model_name, trajs, args, traj_data:TrajData, batch_size=128, required_grad=False):
     embedding_batches = []
     model.eval()
-    with torch.no_grad():
+    grad_context = torch.enable_grad() if required_grad else torch.no_grad()
+    with grad_context:
         for start in range(0, len(trajs), batch_size):
             batch_trajs = trajs[start:start + batch_size]
             batch_embeddings = getEmbeddings(model, model_name, batch_trajs, args.device, traj_data, args.grid_mode)
-            embedding_batches.append(batch_embeddings.cpu())
+            embedding_batches.append(batch_embeddings)
     return torch.cat(embedding_batches, dim=0)

@@ -12,12 +12,13 @@ from utils.data_process import TrajData
 
 from parameter_setting import parse_args
 from utils.syn_data_ini import k_medoids_sampling
-from utils.loss import initialize_loss
+from utils.loss import initialize_loss, gw_loss_chunked,dm_loss
 from models import get_model
 from dataloader import TrajSimLeaDataLoader
 from evaluate import test, getEmbeddings, getEmbeddingsFromFull
 from train import train_one_epoch_convtraj, train_one_epoch_trajcl, train_one_epoch_other, train_one_epoch_dualsim
-from utils.similarity import emds2dist
+from utils.similarity import emds2dist, compute_T
+
 #测试的时候
 # 1. convtraj合成轨迹训练集，验证集和测试集都用离散dataloader, 模型不变
 # 2. dualsimformer weights b,l,1 代表距离一个格子的权重，不等于1，再collate里面设置为1
@@ -48,8 +49,14 @@ yaml.dump(dict(vars(args)), open(os.path.join(save_dir, 'config.yaml'), 'w'))  #
 log_ini(save_dir)
 set_seed(args.seed)
 args.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
+if args.device.type == "cuda":
+    # Optimizer CUDA-graph checks use the current CUDA device/stream. Keep it
+    # aligned with the device where the model and batches are allocated.
+    torch.cuda.set_device(args.device)
+gw_weights = args.gw_weights
 log_and_print(args.grid_mode)
 log_and_print(save_dir)
+log_and_print(gw_weights)
 traj_data = TrajData(args.dataset, args.target_measure, config["datasets"], args.grid_size)
 train_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="train", grid_mode=args.grid_mode)
 eval_dataloader = TrajSimLeaDataLoader(traj_data=traj_data, args=args, mode="eval", grid_mode=args.grid_mode)
@@ -88,18 +95,26 @@ elif args.syn_ini == "randomly_generated":
     y_syn = (A + A.T) / 2
     y_syn[torch.arange(args.syn_num), torch.arange(args.syn_num)] = 0.0
 
-#判断是否使用emb label
-# if args.use_embedding_label == "True" and args.teacher_checkpoint is not None:
-#     log_and_print(f"use emb label, {args.teacher_checkpoint}")
-#     teacher = get_model(args, config, traj_data)
-#     checkpoint = torch.load(args.teacher_checkpoint, map_location=args.device)
-#     teacher.load_state_dict(checkpoint["model_state_dict"])
-#     teacher.eval()
-#     for param in teacher.parameters():
-#         param.requires_grad_(False)
-#     teacher_embeddings = getEmbeddingsFromFull(teacher, args.model, x_syn, args, traj_data)  
-#     teacher_dist = emds2dist(teacher_embeddings, args.emb_sim_metric)
-#     y_syn = teacher_dist.detach().clone().to(args.device)
+#=================随机初始化一个模型，然后计算embedding==========
+gw_teacher = get_model(args, config, traj_data)
+#加载和embeddinglabel相同的teacher
+log_and_print("this means load gw teacher trained")
+checkpoint = torch.load(args.teacher_checkpoint, map_location=args.device)
+gw_teacher.load_state_dict(checkpoint["model_state_dict"])
+gw_teacher.eval()
+
+for param in gw_teacher.parameters():
+    param.requires_grad_(False)
+
+x_real = train_trajs
+x_real_full_vec = getEmbeddingsFromFull(gw_teacher, args.model, x_real, args, traj_data, required_grad=False)
+C_real_full = torch.cdist(x_real_full_vec, x_real_full_vec, p=2) #真实的距离矩阵
+
+# x_syn_full_vec = getEmbeddingsFromFull(gw_teacher, args.model, x_syn, args, traj_data)
+# C_syn_full = torch.cdist(x_syn_full_vec, x_syn_full_vec, p=2)# 合成矩阵的距离矩阵
+
+#计算初始的T
+# T = compute_T(C_real_full, C_syn_full)
 
 
 criterion = initialize_loss(args).to(args.device)
@@ -218,32 +233,53 @@ for it in range(0, args.Iteration + 1):  # 第it次更新合成数据集
     net = get_model(args, config, traj_data)
     net.train()
 
+
     for param in list(net.parameters()):  # 将net的所有参数的requires_grad置为False
         param.requires_grad = False
-    
+
+    x_syn_full_vec = getEmbeddingsFromFull(gw_teacher, args.model, x_syn, args, traj_data, required_grad=True)
+    C_syn_full = torch.cdist(x_syn_full_vec, x_syn_full_vec, p=2)
+
+    T = compute_T(C_real_full, C_syn_full)
+
+
     loss_avg = 0
     ''' update synthetic data '''
     loss = torch.tensor(0.0).to(args.device)
     # 合成轨迹的一个batch
-    syn_minibatch_idx = torch.randperm(syn_num)[:args.use_syn_minibatch]  # 合成轨迹的idx
-    x_syn_minibatch = [x_syn[i] for i in syn_minibatch_idx]  # 挑选一个batch的合成轨迹
+    # syn_minibatch_idx = torch.randperm(syn_num)[:args.use_syn_minibatch]  # 合成轨迹的idx
+    # x_syn_minibatch = [x_syn[i] for i in syn_minibatch_idx]  # 挑选一个batch的合成轨迹
 
-    # 该batch的合成轨迹对应的真实轨迹
-    real_minibatch_idx = []
-    for idx in syn_minibatch_idx:
-        real_minibatch_idx.extend(list(range(idx * args.use_num_real_per_syn, (idx + 1) * args.use_num_real_per_syn))[:args.use_num_real_per_syn])
-    x_real_minibatch = [train_dataloader.dataset.traj_coor[i] for i in real_minibatch_idx]
+    # # 该batch的合成轨迹对应的真实轨迹
+    # real_minibatch_idx = []
+    # for idx in syn_minibatch_idx:
+    #     real_minibatch_idx.extend(list(range(idx * args.use_num_real_per_syn, (idx + 1) * args.use_num_real_per_syn))[:args.use_num_real_per_syn])
+    # x_real_minibatch = [train_dataloader.dataset.traj_coor[i] for i in real_minibatch_idx]
     
-    # x_real_minibatch_vec = getEmbeddings(net, args.model, x_real_minibatch, args.device, traj_data,"soft")
-    x_real_minibatch_vec = getEmbeddings(net, args.model, x_real_minibatch, args.device, traj_data,args.grid_mode)
-    x_real_minibatch_vec = nn.functional.normalize(x_real_minibatch_vec, dim=1)
+    # # x_real_minibatch_vec = getEmbeddings(net, args.model, x_real_minibatch, args.device, traj_data,"soft")
+    # x_real_minibatch_vec = getEmbeddings(net, args.model, x_real_minibatch, args.device, traj_data,args.grid_mode)
+    # x_real_minibatch_vec = nn.functional.normalize(x_real_minibatch_vec, dim=1)
 
-    # x_syn_minibatch_vec = getEmbeddings(net, args.model, x_syn_minibatch, args.device, traj_data,"soft")
-    x_syn_minibatch_vec = getEmbeddings(net, args.model, x_syn_minibatch, args.device, traj_data,args.grid_mode)
-    x_syn_minibatch_vec = nn.functional.normalize(x_syn_minibatch_vec, dim=1)
+    # # x_syn_minibatch_vec = getEmbeddings(net, args.model, x_syn_minibatch, args.device, traj_data,"soft")
+    # x_syn_minibatch_vec = getEmbeddings(net, args.model, x_syn_minibatch, args.device, traj_data,args.grid_mode)
+    # x_syn_minibatch_vec = nn.functional.normalize(x_syn_minibatch_vec, dim=1)
+    #计算原始embedding均值
+    # loss += torch.sum((torch.mean(x_real_minibatch_vec, dim=0) - torch.mean(x_syn_minibatch_vec, dim=0))**2)
 
-    loss += torch.sum((torch.mean(x_real_minibatch_vec, dim=0) - torch.mean(x_syn_minibatch_vec, dim=0))**2)
+    #计算加权的embedding距离
+    x_real_vec = getEmbeddingsFromFull(net, args.model, x_real, args, traj_data, required_grad=False)
+    x_syn_vec = getEmbeddingsFromFull(net, args.model, x_syn, args, traj_data, required_grad=True)
 
+    x_real_vec = nn.functional.normalize(x_real_vec, dim=1)
+    x_syn_vec = nn.functional.normalize(x_syn_vec, dim=1)
+
+    pi = T.T.to(args.device) #M, N
+
+    loss_dm = dm_loss( x_syn_vec, x_real_vec, pi)
+    loss_gw = gw_loss_chunked(C_real_full, C_syn_full, T)
+
+    loss = loss_dm + gw_weights * loss_gw
+    
     optimizer_data.zero_grad()
     loss.backward()
     optimizer_data.step()  # 更新数据

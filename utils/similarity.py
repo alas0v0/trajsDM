@@ -4,9 +4,10 @@
 # 2. emds2sim: Given embedding vectors, calculate the similarity matrix
 
 from torchmetrics.functional.pairwise import pairwise_cosine_similarity
+import ot
 import torch 
 from torch import nn
-
+import numpy as np
 
 def chebyshev_distance(v1, v2):
     """
@@ -107,4 +108,85 @@ def emds2dist(emds, metric="euc"):
     dist_matrix.fill_diagonal_(0.0)
     return dist_matrix
 
+def pairwise_distance(X, metric="euclidean"):
+    """
+    X: [N, d] 特征矩阵
+    return: [N, N] 距离矩阵
+    """
+    X = torch.as_tensor(X, dtype=torch.float32)
 
+    if metric == "euclidean":
+        D = torch.cdist(X, X, p=2)
+    elif metric == "cosine":
+        X = torch.nn.functional.normalize(X, dim=-1)
+        D = 1.0 - X @ X.T
+    else:
+        raise ValueError(f"Unsupported metric: {metric}")
+
+    return D.clamp_min(0)
+
+
+def compute_T(
+    C_real,
+    C_syn,
+    p=None,
+    q=None,
+    epsilon=0.05,
+    tol=1e-4,
+    max_iter=300,
+    numItermax=None,
+    verbose=False,
+):
+    if p is None:
+        p = torch.full(
+            (C_real.shape[0],),
+            1.0 / C_real.shape[0],
+            dtype=C_real.dtype,
+            device=C_real.device,
+        )
+    else:
+        p = torch.as_tensor(p, dtype=C_real.dtype, device=C_real.device)
+        p = torch.clamp(p, min=1e-12)
+        p = p / p.sum()
+
+    if q is None:
+        q = torch.full(
+            (C_syn.shape[0],),
+            1.0 / C_syn.shape[0],
+            dtype=C_syn.dtype,
+            device=C_syn.device,
+        )
+    else:
+        q = torch.as_tensor(q, dtype=C_real.dtype, device=C_real.device)
+        q = torch.clamp(q, min=1e-12)
+        q = q / q.sum()
+
+    gw_kwargs = {
+        "C1": C_real,
+        "C2": C_syn.detach(),
+        "p": p,
+        "q": q,
+        "loss_fun": "square_loss",
+        "epsilon": epsilon,
+        "tol": tol,
+        "max_iter": max_iter,
+        "verbose": verbose,
+        "log": verbose,
+    }
+    if numItermax is not None:
+        gw_kwargs["numItermax"] = numItermax
+
+    result = ot.gromov.entropic_gromov_wasserstein(**gw_kwargs)
+    if verbose:
+        T, ot_log = result
+        errors = ot_log.get("err", [])
+        final_error = errors[-1] if errors else None
+        print(
+            f"[compute_T] iterations={len(errors)}, "
+            f"final_error={final_error}"
+        )
+    else:
+        T = result
+    T = torch.as_tensor(T, dtype=C_syn.dtype, device=C_syn.device)
+
+    return T
